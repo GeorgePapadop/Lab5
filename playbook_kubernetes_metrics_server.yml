@@ -1,0 +1,18 @@
+- hosts: k8-master
+  become: true
+  tasks:
+
+    - name: Update repositories cache and update/install zip package to the latest version
+      apt:
+        name: zip
+        state: latest
+        update_cache: yes
+
+    - name: Download and unzip metric files
+      unarchive:
+        remote_src: yes
+        src: https://surfdrive.surf.nl/files/index.php/s/RCxPtHnz1agrY7V/download
+        dest: $HOME/
+
+    - name: Deploy Metrics Server
+      shell: kubectl create -f $HOME/kubernetes/

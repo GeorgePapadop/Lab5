@@ -1,0 +1,18 @@
+[k8-master]
+ec2-54-145-53-121.compute-1.amazonaws.com
+
+[worker]
+ ec2-54-164-71-206.compute-1.amazonaws.com
+ ec2-35-173-203-211.compute-1.amazonaws.com
+ ec2-3-86-56-170.compute-1.amazonaws.com
+ ec2-3-80-174-79.compute-1.amazonaws.com
+
+
+[cluster:children]
+k8-master
+worker
+
+[cluster:vars]
+ansible_ssh_private_key_file=/mnt/c/Users/User/Downloads/devopslab01.pem
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+ansible_ssh_user=ubuntu

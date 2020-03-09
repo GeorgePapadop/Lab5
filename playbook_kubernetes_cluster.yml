@@ -1,0 +1,104 @@
+- hosts: cluster
+  become: true
+  tasks:
+    - name: Install boostrap python
+      raw: test -e /usr/bin/python || (apt -y update && apt install -y python)
+
+    - name: Update repositories cache and update/install docker.io package to the latest version
+      apt:
+        name: docker.io
+        state: latest
+        update_cache: yes
+
+    - name: Update repositories cache and update/install apt-transport-https package to the latest version
+      apt:
+        name: apt-transport-https
+        state: latest
+        update_cache: yes
+
+    - name: Add GPG key
+      apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+
+    - apt_repository:
+        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+
+    - name: Update repositories cache and update/install kubelet package to the latest version
+      apt:
+        name: kubelet
+        state: latest
+        update_cache: yes
+
+    - name: Update repositories cache and update/install kubeadm package to the latest version
+      apt:
+        name: kubeadm
+        state: latest
+        update_cache: yes
+
+    - name: Update repositories cache and update/install kubernetes-cni package to the latest version
+      apt:
+        name: kubernetes-cni
+        state: latest
+        update_cache: yes
+
+- hosts: k8-master
+  become: true
+  tasks:
+
+    - name: Execute kubeadm init 
+      shell: kubeadm init
+
+    - name: Create directory $HOME/.kube
+      file:
+        path: $HOME/.kube
+        state: directory
+        mode: '0755'
+
+    - name: Copy config file
+      shell: cp /etc/kubernetes/admin.conf $HOME/.kube/config
+
+    - sysctl:
+        name: net.bridge.bridge-nf-call-iptables
+        value: '1'
+        state: present
+
+    - name: Install Weave Net addon
+      shell: kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+
+    - name: Allow muster to schedule pods
+      shell: kubectl taint nodes --all node-role.kubernetes.io/master-
+
+    - name: Print 'join' command for all workers for next play
+      shell: kubeadm token create --print-join-command
+      register: output_var
+
+    - debug:
+        msg: "Output_var is {{ output_var.stdout }}"
+
+    - name: Add output_var to dummy host
+      add_host:
+          name: "output_var_holder"
+          variable: "{{ output_var.stdout }}"
+
+- hosts: worker
+  become: true
+  tasks:
+
+    - debug:
+        msg: "The command is {{ hostvars['output_var_holder']['variable'] }}"
+
+    - name: Execute the join command from the previous play
+      shell: "{{ hostvars['output_var_holder']['variable'] }}" 
+
+- hosts: k8-master
+  become: true
+  tasks:
+
+    - name: Verify that workers have joined the cluster
+      shell: kubectl get nodes
+      register: num_workers
+
+    - debug:
+        msg: "{{ num_workers.stdout }}"
